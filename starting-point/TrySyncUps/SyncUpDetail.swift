@@ -5,18 +5,35 @@ import SwiftUI
 struct SyncUpDetailFeature {
   @ObservableState
   struct State: Equatable {
+    @Presents var alert: AlertState<Action.Alert>?
     @Presents var editSyncUp: SyncUpFormFeature.State?
     @Shared var syncUp: SyncUp
   }
   enum Action {
+    case alert(PresentationAction<Alert>)
     case editButtonTapped
     case editSyncUp(PresentationAction<SyncUpFormFeature.Action>)
     case cancelButtonTapped
     case saveButtonTapped
+    case deleteButtonTapped
+
+    enum Alert {
+      case confirmDeletion
+    }
   }
+  @Dependency(\.dismiss) var dismiss
   var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
+      case .alert(.presented(.confirmDeletion)):
+//        @Shared(.fileStorage(.syncUps)) var syncUps: [SyncUp] = []
+//        syncUps.removeAll(where: { $0.id == state.syncUp.id })
+//        return .run { _ in
+//          await dismiss()
+//        }
+        return .none
+      case .alert:
+        return .none
       case .editButtonTapped:
         state.editSyncUp = SyncUpFormFeature.State(syncUp: state.syncUp)
         return .none
@@ -32,11 +49,21 @@ struct SyncUpDetailFeature {
         state.syncUp = syncUp
         state.editSyncUp = nil
         return .none
+      case .deleteButtonTapped:
+        state.alert = AlertState {
+          TextState("Are you sure you want to delete this sync up?")
+        } actions: {
+          ButtonState(role: .destructive, action: .confirmDeletion) {
+            TextState("Delete")
+          }
+        }
+        return .none
       }
     }
     .ifLet(\.$editSyncUp, action: \.editSyncUp) {
       SyncUpFormFeature()
     }
+    .ifLet(\.$alert, action: \.alert)
   }
 }
 
@@ -103,7 +130,7 @@ struct SyncUpDetailView: View {
 
       Section {
         Button("Delete") {
-          /*@START_MENU_TOKEN@*//*@PLACEHOLDER=Do something...@*//*@END_MENU_TOKEN@*/
+          store.send(.deleteButtonTapped)
         }
         .foregroundColor(.red)
         .frame(maxWidth: .infinity)
@@ -133,6 +160,7 @@ struct SyncUpDetailView: View {
           }
       }
     }
+    .alert($store.scope(state: \.alert, action: \.alert))
   }
 }
 
@@ -140,7 +168,7 @@ struct SyncUpDetailView: View {
   NavigationStack {
     SyncUpDetailView(
       store: Store(initialState: SyncUpDetailFeature.State(syncUp: Shared(.mock))) {
-        SyncUpDetailFeature()
+        SyncUpDetailFeature()._printChanges()
       }
     )
   }
